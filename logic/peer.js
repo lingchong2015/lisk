@@ -14,8 +14,8 @@
 
 'use strict';
 
-var _ = require('lodash');
-var ip = require('ip');
+const _ = require('lodash');
+const ip = require('ip');
 
 /**
  * Creates a peer.
@@ -172,7 +172,7 @@ Peer.prototype.update = function(peer) {
  * @return {peer} clones current peer
  */
 Peer.prototype.object = function() {
-	var copy = {};
+	const copy = {};
 
 	_.each(this.properties, key => {
 		copy[key] = this[key];
