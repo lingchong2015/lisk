@@ -15,12 +15,14 @@
 'use strict';
 
 var rewire = require('rewire');
+var sinon = require('sinon');
 var randomstring = require('randomstring');
 var prefixedPeer = require('../../fixtures/peers').randomNormalizedPeer;
 var Peer = require('../../../logic/peer');
 var generateRandomActivePeer = require('../../fixtures/peers')
 	.generateRandomActivePeer;
 var constants = require('../../../helpers/constants');
+var jobsQueue = require('../../../helpers/jobs_queue');
 var generateMatchedAndUnmatchedBroadhashes = require('../common/helpers/peers')
 	.generateMatchedAndUnmatchedBroadhashes;
 var modulesLoader = require('../../common/modules_loader');
@@ -755,7 +757,7 @@ describe('peers', () => {
 	});
 
 	describe('onBlockchainReady', () => {
-		var originalPeersList;
+		let originalPeersList;
 
 		beforeEach(() => {
 			originalPeersList = PeersRewired.__get__('library.config.peers.list');
@@ -769,51 +771,98 @@ describe('peers', () => {
 			peers.discover.restore();
 		});
 
-		it('should update peers during onBlockchainReady', done => {
-			peers.onBlockchainReady();
-			setTimeout(() => {
-				expect(peers.discover.calledOnce).to.be.ok;
-				done();
-			}, 100);
+		describe('insertSeeds', () => {
+			describe('when library.config.peers.list contains seed peers', () => {
+				let seedPeersList;
+
+				beforeEach(done => {
+					seedPeersList = [
+						{
+							rpc: {
+								status: sinonSandbox
+									.stub()
+									.callsArgWith(0, 'Failed to get peer status'),
+							},
+							applyHeaders: sinonSandbox.stub(),
+						},
+					];
+					PeersRewired.__set__('library.config.peers.list', seedPeersList);
+					peersLogicMock.upsert = sinonSandbox.spy();
+					// Call onBlockchainReady and wait 100ms
+					peers.onBlockchainReady();
+					setTimeout(done, 100);
+				});
+
+				it('should call library.logic.upsert with seed peers', () => {
+					seedPeersList.forEach(seedPeer => {
+						expect(peersLogicMock.upsert).calledWith(seedPeer, true);
+					});
+				});
+			});
 		});
 
-		it('should update peers list onBlockchainReady even if rpc.status call fails', done => {
-			var peerStub = {
-				rpc: {
-					status: sinonSandbox
-						.stub()
-						.callsArgWith(0, 'Failed to get peer status'),
-				},
-				applyHeaders: sinonSandbox.stub(),
-			};
+		describe('importFromDatabase', () => {
+			describe('when library.db.peers.list returns results', () => {
+				let dbPeersListResults;
 
-			PeersRewired.__set__('library.config.peers.list', [peerStub]);
-			peersLogicMock.upsert = sinonSandbox.spy();
+				beforeEach(done => {
+					dbPeersListResults = [prefixedPeer];
+					PeersRewired.__set__(
+						'library.db.peers.list',
+						sinon.stub().resolves(dbPeersListResults)
+					);
+					peersLogicMock.upsert = sinonSandbox.spy();
+					// Call onBlockchainReady and wait 100ms
+					peers.onBlockchainReady();
+					setTimeout(done, 100);
+				});
 
-			peers.onBlockchainReady();
-			setTimeout(() => {
-				expect(peersLogicMock.upsert.calledWith(peerStub, false)).to.be.true;
-				done();
-			}, 100);
+				it('should call library.logic.upsert with seed peers', () => {
+					dbPeersListResults.forEach(dbPeer => {
+						expect(peersLogicMock.upsert).calledWith(dbPeer, true);
+					});
+				});
+			});
+		});
+
+		describe('discoverNew', () => {
+			beforeEach('call onBlockchainReady() and wait 100ms', done => {
+				peers.onBlockchainReady();
+				setTimeout(done, 100);
+			});
+
+			it('should call peers.discover only once', () => {
+				expect(peers.discover.calledOnce).to.be.ok;
+			});
 		});
 	});
 
 	describe('onPeersReady', () => {
-		before(() => {
+		let jobsQueueSpy;
+		beforeEach(done => {
 			peersLogicMock.list = sinonSandbox.stub().returns([]);
 			sinonSandbox.stub(peers, 'discover').callsArgWith(0, null);
+			jobsQueue.jobs = {};
+			jobsQueueSpy = sinon.spy(jobsQueue, 'register');
+			peers.onPeersReady();
+			setTimeout(done, 100);
 		});
 
-		after(() => {
+		afterEach(() => {
+			jobsQueueSpy.restore();
 			peers.discover.restore();
 		});
 
-		it('should update peers during onBlockchainReady', done => {
-			peers.onPeersReady();
-			setTimeout(() => {
-				expect(peers.discover.calledOnce).to.be.ok;
-				done();
-			}, 100);
+		it('should call peers.discover', () => {
+			expect(peers.discover.calledOnce).to.be.ok;
+		});
+
+		it('should start peers discovery process by registering it in jobsQueue every 5 sec', () => {
+			expect(jobsQueueSpy).calledWith(
+				'peersDiscoveryAndUpdate',
+				sinon.match.func,
+				5000
+			);
 		});
 	});
 
