@@ -532,7 +532,7 @@ Transport.prototype.shared = {
 		);
 	},
 
-	postBlock(query, cb) {
+	postBlock(query) {
 		query = query || {};
 		var block;
 		try {
@@ -549,13 +549,9 @@ Transport.prototype.shared = {
 			});
 
 			__private.removePeer({ peer: query.peer, code: 'EBLOCK' });
-
-			return setImmediate(cb, e.toString());
 		}
 
 		library.bus.message('receiveBlock', block);
-
-		return setImmediate(cb, null, { success: true, blockId: block.id });
 	},
 
 	list(req, cb) {
