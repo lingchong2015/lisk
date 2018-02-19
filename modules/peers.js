@@ -233,6 +233,9 @@ __private.insertSeeds = function(cb) {
 		(peer, eachCb) => {
 			peer = library.logic.peers.create(peer);
 			library.logger.debug(`Processing seed peer: ${peer.string}`);
+			if (library.logic.peers.upsert(peer, true) !== true) {
+				return setImmediate(eachCb);
+			}
 			peer.rpc.status((err, status) => {
 				__private.updatePeerStatus(err, status, peer);
 				if (!err) {
@@ -240,7 +243,7 @@ __private.insertSeeds = function(cb) {
 				} else {
 					library.logger.trace(`Ping peer failed: ${peer.string}`, err);
 				}
-				return setImmediate(eachCb, err);
+				return setImmediate(eachCb);
 			});
 		},
 		() => {
@@ -274,17 +277,10 @@ __private.dbLoad = function(cb) {
 				rows,
 				(peer, eachCb) => {
 					peer = library.logic.peers.create(peer);
-					if (library.logic.peers.exists(peer)) {
-						peer = library.logic.peers.get(peer);
-						if (peer && peer.state > 0 && Date.now() - peer.updated > 3000) {
-							return updatePeer(peer, eachCb);
-						}
+					if (library.logic.peers.upsert(peer, true) !== true) {
 						return setImmediate(eachCb);
 					}
-
-					return updatePeer(peer, eachCb);
-
-					function updatePeer(peer) {
+					if (peer.state > 0 && Date.now() - peer.updated > 3000) {
 						peer.rpc.status((err, status) => {
 							__private.updatePeerStatus(err, status, peer);
 							if (!err) {
@@ -298,6 +294,7 @@ __private.dbLoad = function(cb) {
 							return setImmediate(eachCb);
 						});
 					}
+					return setImmediate(eachCb);
 				},
 				() => {
 					library.logger.trace('Peers->dbLoad Peers discovered', {
