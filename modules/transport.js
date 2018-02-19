@@ -113,7 +113,7 @@ __private.removePeer = function(options, extraMessage) {
  * @param {function} cb
  * @return {setImmediateCallback} cb, err
  */
-__private.receiveSignatures = function(query, cb) {
+__private.receiveSignatures = function(query, cb = () => {}) {
 	var signatures;
 
 	async.series(
@@ -158,7 +158,7 @@ __private.receiveSignatures = function(query, cb) {
  * @param {Object} query.transaction
  * @return {setImmediateCallback} cb | error messages
  */
-__private.receiveSignature = function(query, cb) {
+__private.receiveSignature = function(query, cb = () => {}) {
 	library.schema.validate(query, definitions.Signature, err => {
 		if (err) {
 			return setImmediate(cb, `Invalid signature body ${err[0].message}`);
@@ -185,7 +185,12 @@ __private.receiveSignature = function(query, cb) {
  * @param {function} cb
  * @return {setImmediateCallback} cb, err
  */
-__private.receiveTransactions = function(query, peer, extraLogMessage, cb) {
+__private.receiveTransactions = function(
+	query,
+	peer,
+	extraLogMessage,
+	cb = () => {}
+) {
 	var transactions;
 
 	transactions = query.transactions;
@@ -231,7 +236,7 @@ __private.receiveTransaction = function(
 	transaction,
 	peer,
 	extraLogMessage,
-	cb
+	cb = () => {}
 ) {
 	var id = transaction ? transaction.id : 'null';
 
