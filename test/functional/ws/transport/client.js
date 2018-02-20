@@ -16,6 +16,7 @@
 
 require('../../functional.js');
 const MasterWAMPServer = require('wamp-socket-cluster/MasterWAMPServer');
+const connect = require('../../../../api/ws/rpc/connect');
 const failureCodes = require('../../../../api/ws/rpc/failure_codes');
 const wsRPC = require('../../../../api/ws/rpc/ws_rpc').wsRPC;
 const transport = require('../../../../api/ws/transport');
@@ -27,6 +28,12 @@ describe('RPC Client', () => {
 	const validWSServerPort = 5000;
 	let validClientRPCStub;
 	let socketClusterMock;
+	let connectionClosedErrorCode;
+	let connectionClosedErrorDescription;
+
+	function reconnect(ip = validWSServerIp, wsPort = validWSServerPort) {
+		validClientRPCStub = connect({ ip, wsPort }).rpc;
+	}
 
 	before(() => {
 		socketClusterMock = {
@@ -37,10 +44,7 @@ describe('RPC Client', () => {
 		const transportModuleMock = { internal: {}, shared: {} };
 		transport(transportModuleMock);
 		// Now ClientRPCStub should contain all methods names
-		validClientRPCStub = wsRPC.getClientRPCStub(
-			validWSServerIp,
-			validWSServerPort
-		);
+		reconnect();
 	});
 
 	describe('should contain remote procedure', () => {
@@ -91,6 +95,7 @@ describe('RPC Client', () => {
 		beforeEach(() => {
 			validHeaders = WSServer.generatePeerHeaders();
 			System.setHeaders(validHeaders);
+			reconnect();
 		});
 
 		describe('with valid headers', () => {
@@ -110,166 +115,179 @@ describe('RPC Client', () => {
 		});
 
 		describe('with invalid headers', () => {
-			beforeEach(() => {
-				wsRPC.clientsConnectionsMap = {};
-				validClientRPCStub = wsRPC.getClientRPCStub(
-					validWSServerIp,
-					validWSServerPort
-				);
-			});
+			describe('without port', () => {
+				beforeEach(() => {
+					delete validHeaders.wsPort;
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
 
-			it('without port should call RPC callback with INVALID_HEADERS error', done => {
-				delete validHeaders.wsPort;
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal('wsPort: Expected type integer but found type not-a-number');
-					done();
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('with valid port as string should call RPC callback without an error', done => {
-				validHeaders.wsPort = validHeaders.wsPort.toString();
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err).to.be.null;
-					done();
+			// ToDo: Throws "Unable to find resolving function for procedure status with signature ..." error
+			describe('with valid port as string', () => {
+				beforeEach(() => {
+					validHeaders.wsPort = validHeaders.wsPort.toString();
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = null', done => {
+					validClientRPCStub.status(err => {
+						expect(err).to.be.null;
+						done();
+					});
+				});
+
+				it('should close client connection with description = "Expected type integer but found type not-a-number"', done => {
+					validClientRPCStub.status(() => {
+						expect(connectionClosedErrorCode).equal(
+							failureCodes.INVALID_HEADERS
+						);
+						expect(connectionClosedErrorDescription).equal(
+							'Expected type integer but found type not-a-number'
+						);
+						done();
+					});
 				});
 			});
 
-			it('with too short nonce should call RPC callback with INVALID_HEADERS error', done => {
-				validHeaders.nonce = 'TOO_SHORT';
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal('nonce: String is too short (9 chars), minimum 16');
-					done();
+			describe('with too short nonce', () => {
+				beforeEach(() => {
+					validHeaders.nonce = 'TOO_SHORT';
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('with too long nonce should call RPC callback with INVALID_HEADERS error', done => {
-				validHeaders.nonce = 'NONCE_LONGER_THAN_16_CHARS';
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal('nonce: String is too long (26 chars), maximum 16');
-					done();
+			describe('with too short nonce', () => {
+				beforeEach(() => {
+					validHeaders.nonce = 'TOO_SHORT';
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('without nonce should call RPC callback with INVALID_HEADERS error', done => {
-				delete validHeaders.nonce;
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal(': Missing required property: nonce');
-					done();
+			// it('with too short nonce should close WS connection with INVALID_HEADERS error', done => {
+			// 	validHeaders.nonce = 'TOO_SHORT';
+			// 	System.setHeaders(validHeaders);
+			// 	validClientRPCStub.status(err => {
+			// 		expect(err)
+			// 			.to.have.property('code')
+			// 			.equal(failureCodes.INVALID_HEADERS);
+			// 		expect(err)
+			// 			.to.have.property('description')
+			// 			.equal('nonce: String is too short (9 chars), minimum 16');
+			// 		done();
+			// 	});
+			// });
+
+			describe('with too long nonce', () => {
+				beforeEach(() => {
+					validHeaders.nonce = 'NONCE_LONGER_THAN_16_CHARS';
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('without nethash should call RPC callback with INVALID_HEADERS error', done => {
-				delete validHeaders.nethash;
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal(': Missing required property: nethash');
-					done();
+			// it('with too long nonce should close WS connection with INVALID_HEADERS error', done => {
+			// 	validHeaders.nonce = 'NONCE_LONGER_THAN_16_CHARS';
+			// 	System.setHeaders(validHeaders);
+			// 	validClientRPCStub.status(err => {
+			// 		expect(err)
+			// 			.to.have.property('code')
+			// 			.equal(failureCodes.INVALID_HEADERS);
+			// 		expect(err)
+			// 			.to.have.property('description')
+			// 			.equal('nonce: String is too long (26 chars), maximum 16');
+			// 		done();
+			// 	});
+			// });
+
+			describe('without nonce', () => {
+				beforeEach(() => {
+					delete validHeaders.nonce;
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('without height should call RPC callback with INVALID_HEADERS error', done => {
-				delete validHeaders.height;
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal('height: Expected type integer but found type not-a-number');
-					done();
+			describe('without nethash', () => {
+				beforeEach(() => {
+					delete validHeaders.nethash;
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 
-			it('without version should call RPC callback with INVALID_HEADERS error', done => {
-				delete validHeaders.version;
-				System.setHeaders(validHeaders);
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.INVALID_HEADERS);
-					expect(err)
-						.to.have.property('description')
-						.equal(': Missing required property: version');
-					done();
+			describe('without height', () => {
+				beforeEach(() => {
+					delete validHeaders.height;
+					System.setHeaders(validHeaders);
+					reconnect();
+				});
+
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
-		});
-	});
 
-	describe('when reaching', () => {
-		describe('not reachable server', () => {
-			before(() => {
-				const invalisServerIp = '1.1.1.1';
-				const invalisServerPort = 1111;
-				validClientRPCStub = wsRPC.getClientRPCStub(
-					invalisServerIp,
-					invalisServerPort
-				);
-			});
-
-			it('should call RPC callback with CONNECTION_TIMEOUT error', done => {
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.CONNECTION_TIMEOUT);
-					expect(err)
-						.to.have.property('message')
-						.equal(failureCodes.errorMessages[failureCodes.CONNECTION_TIMEOUT]);
-					done();
+			describe('without version', () => {
+				beforeEach(() => {
+					delete validHeaders.version;
+					System.setHeaders(validHeaders);
+					reconnect();
 				});
-			});
-		});
 
-		describe('not existing server', () => {
-			before(() => {
-				const validServerIp = '127.0.0.1';
-				const invalisServerPort = 1111;
-				validClientRPCStub = wsRPC.getClientRPCStub(
-					validServerIp,
-					invalisServerPort
-				);
-			});
-
-			it('should call RPC callback with HANDSHAKE_ERROR error', done => {
-				validClientRPCStub.status(err => {
-					expect(err)
-						.to.have.property('code')
-						.equal(failureCodes.HANDSHAKE_ERROR);
-					expect(err)
-						.to.have.property('message')
-						.equal(failureCodes.errorMessages[failureCodes.HANDSHAKE_ERROR]);
-					done();
+				it('should call rpc.status with err = "RPC response timeout exceeded"', done => {
+					validClientRPCStub.status(err => {
+						expect(err).equal('RPC response timeout exceeded');
+						done();
+					});
 				});
 			});
 		});
