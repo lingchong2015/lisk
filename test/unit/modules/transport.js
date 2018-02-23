@@ -1646,16 +1646,14 @@ describe('transport', () => {
 					it('should set query = {}');
 				});
 
-				it('should call modules.blocks.utils.loadBlocksData');
-
 				it(
 					'should call modules.blocks.utils.loadBlocksData with { limit: 34,lastId: query.lastBlockId }'
 				);
 
 				describe('when modules.blocks.utils.loadBlocksData fails', () => {
-					it('should call callback with error = null');
-
-					it('should call callback with result = { blocks: [] }');
+					it(
+						'should call callback with error = null and result = { blocks: [] }'
+					);
 				});
 			});
 
@@ -1665,17 +1663,9 @@ describe('transport', () => {
 				});
 
 				describe('when it throws', () => {
-					it('should call library.logger.debug');
-
 					it(
-						'should call library.logger.debug with "Block normalization failed"'
+						'should call library.logger.debug with "Block normalization failed" and {err: e.toString(), module: "transport", block: query.block }'
 					);
-
-					it(
-						'should call library.logger.debug with {err: e.toString(), module: "transport", block: query.block }'
-					);
-
-					it('should call __private.removePeer');
 
 					it(
 						'should call __private.removePeer with {peer: query.peer, code: "EBLOCK"}'
@@ -1686,13 +1676,9 @@ describe('transport', () => {
 
 				describe('when it does not throw', () => {
 					describe('when query.block is defined', () => {
-						it('should call bson.deserialize');
-
 						it('should call bson.deserialize with Buffer.from(query.block)');
 
 						describe('block', () => {
-							it('should call modules.blocks.verify.addBlockProperties');
-
 							it(
 								'should call modules.blocks.verify.addBlockProperties with query.block'
 							);
@@ -1702,16 +1688,10 @@ describe('transport', () => {
 					it('should call library.logic.block.objectNormalize');
 				});
 
-				it('should call library.bus.message');
-
-				it('should call library.bus.message with "receiveBlock"');
-
-				it('should call library.bus.message with block');
-
-				it('should call callback with error = null');
+				it('should call library.bus.message with "receiveBlock" and block');
 
 				it(
-					'should call callback with result = {success: true, blockId: block.id}'
+					'should call callback with error = null and result = {success: true, blockId: block.id}'
 				);
 			});
 
@@ -1730,8 +1710,6 @@ describe('transport', () => {
 					});
 				});
 
-				it('should call peersFinder');
-
 				it(
 					'should call peersFinder with Object.assign({}, {limit: constants.maxPeers}, req.query)'
 				);
@@ -1740,80 +1718,60 @@ describe('transport', () => {
 					it('should set peers to []');
 				});
 
-				it('should return callback with error = null');
-
 				it(
-					'should return callback with result = {success: !err, peers: peers}'
+					'should return callback with error = null and result = {success: !err, peers: peers}'
 				);
 			});
 
 			describe('height', () => {
-				it('should call callback with error = null');
-
 				it(
-					'should call callback with result = {success: true, height: modules.system.getHeight()}'
+					'should call callback with error = null and result = {success: true, height: modules.system.getHeight()}'
 				);
 			});
 
 			describe('status', () => {
-				it('should call callback with error = null');
-
 				it(
-					'should call callback with result = {success: true, height: modules.system.getHeight(), broadhash: modules.system.getBroadhash(), nonce: modules.system.getNonce()}'
+					'should call callback with error = null and result = {success: true, height: modules.system.getHeight(), broadhash: modules.system.getBroadhash(), nonce: modules.system.getNonce()}'
 				);
 			});
 
 			describe('postSignatures', () => {
 				describe('when query.signatures is defined', () => {
-					it('should call __private.receiveSignatures');
-
 					it('should call __private.receiveSignatures with query');
 
 					describe('when __private.receiveSignatures fails', () => {
-						it('should call callback with error = null');
-
 						it(
-							'should call callback with result = {success: false, message: err}'
+							'should call callback with error = null and result = {success: false, message: err}'
 						);
 					});
 
 					describe('when __private.receiveSignatures succeeds', () => {
-						it('should call callback with error = null');
-
-						it('should call callback with result = {success: true}');
+						it(
+							'should call callback with error = null and result = {success: true}'
+						);
 					});
 				});
 
 				describe('when query.signatures is undefined', () => {
-					it('should call __private.receiveSignature');
-
 					it('should call __private.receiveSignature with query.signature');
 
 					describe('when __private.receiveSignature fails', () => {
-						it('should call callback with error = null');
-
 						it(
-							'should call callback with result = {success: false, message: err}'
+							'should call callback with error = null and result = {success: false, message: err}'
 						);
 					});
 
 					describe('when __private.receiveSignature succeeds', () => {
-						it('should call callback with error = null');
-
-						it('should call callback with result = {success: true}');
+						it(
+							'should call callback with error = null and result = {success: true}'
+						);
 					});
 				});
 			});
 
 			describe('getSignatures', () => {
-				it('should call modules.transactions.getMultisignatureTransactionList');
-
 				it(
-					'should call modules.transactions.getMultisignatureTransactionList with true'
-				);
-
-				it(
-					'should call modules.transactions.getMultisignatureTransactionList with constants.maxSharedTxs'
+					'should call modules.transactions.getMultisignatureTransactionList with true and constants.maxSharedTxs'
 				);
 
 				describe('for every transaction', () => {
@@ -1828,82 +1786,54 @@ describe('transport', () => {
 					});
 				});
 
-				it('should call callback with error = null');
-
 				it(
-					'should call callback with result = {success: true, signatures: signatures}'
+					'should call callback with error = null and result = {success: true, signatures: signatures}'
 				);
 			});
 
 			describe('getTransactions', () => {
-				it('should call modules.transactions.getMergedTransactionList');
-
 				it(
-					'should call modules.transactions.getMergedTransactionList with true'
+					'should call modules.transactions.getMergedTransactionList with true and constants.maxSharedTxs'
 				);
 
 				it(
-					'should call modules.transactions.getMergedTransactionList with constants.maxSharedTxs'
-				);
-
-				it('should call callback with error = null');
-
-				it(
-					'should call callback with result = {success: true, transactions: transactions}'
+					'should call callback with error = null and result = {success: true, transactions: transactions}'
 				);
 			});
 
 			describe('postTransactions', () => {
 				describe('when query.transactions is defined', () => {
-					it('should call __private.receiveTransactions');
-
-					it('should call __private.receiveTransactions with query');
-
-					it('should call __private.receiveTransactions with query.peer');
-
 					it(
-						'should call __private.receiveTransactions with query.extraLogMessage'
+						'should call __private.receiveTransactions with query and query.peer and query.extraLogMessage'
 					);
 
 					describe('when __private.receiveTransactions fails', () => {
-						it('should call callback with error = null');
-
 						it(
-							'should call callback with result = {success: false, message: err}'
+							'should call callback with error = null and result = {success: false, message: err}'
 						);
 					});
 
 					describe('when __private.receiveTransactions succeeds', () => {
-						it('should call callback with error = null');
-
-						it('should call callback with result = {success: true}');
+						it(
+							'should call callback with error = null and result = {success: true}'
+						);
 					});
 				});
 
 				describe('when query.transactions is undefined', () => {
-					it('should call __private.receiveTransaction');
-
-					it('should call __private.receiveTransaction with query.transaction');
-
-					it('should call __private.receiveTransaction with query.peer');
-
 					it(
-						'should call __private.receiveTransaction with query.extraLogMessage'
+						'should call __private.receiveTransaction with query.transaction and query.peer and query.extraLogMessage'
 					);
 
 					describe('when __private.receiveTransaction fails', () => {
-						it('should call callback with error = null');
-
 						it(
-							'should call callback with result = {success: false,  message: err}'
+							'should call callback with error = null and result = {success: false,  message: err}'
 						);
 					});
 
 					describe('when __private.receiveTransaction succeeds', () => {
-						it('should call callback with error = null');
-
 						it(
-							'should call callback with result = {success: true, transactionId: id}'
+							'should call callback with error = null and result = {success: true, transactionId: id}'
 						);
 					});
 				});
@@ -1912,11 +1842,9 @@ describe('transport', () => {
 	});
 
 	describe('__private.checkInternalAccess', () => {
-		it('should call library.schema.validate');
-
-		it('should call library.schema.validate with query');
-
-		it('should call library.schema.validate with schema.internalAccess');
+		it(
+			'should call library.schema.validate with query and schema.internalAccess'
+		);
 
 		describe('when library.schema.validate fails', () => {
 			it('should call callback with error = err[0].message');
@@ -1929,16 +1857,12 @@ describe('transport', () => {
 				);
 			});
 
-			it('should call callback with error = null');
-
-			it('should call callback with result = undefined');
+			it('should call callback with error = null and result = undefined');
 		});
 	});
 
 	describe('Transport.prototype.internal', () => {
 		describe('updatePeer', () => {
-			it('should call __private.checkInternalAccess');
-
 			it('should call __private.checkInternalAccess with query');
 
 			describe('when __private.checkInternalAccess fails', () => {
@@ -1948,14 +1872,10 @@ describe('transport', () => {
 			describe('when __private.checkInternalAccess succeeds', () => {
 				describe('updateResult', () => {
 					describe('when query.updateType = 0 (insert)', () => {
-						it('should call modules.peers.update');
-
 						it('should call modules.peers.update with query.peer');
 					});
 
 					describe('when query.updateType = 1 (remove)', () => {
-						it('should call modules.peers.remove');
-
 						it('should call modules.peers.remove with query.peer');
 					});
 				});
