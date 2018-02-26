@@ -1009,6 +1009,9 @@ describe('transport', () => {
 						peers: {
 							me: sinonSandbox.stub().returns(WSServer.generatePeerHeaders()),
 						},
+						block: {
+							objectNormalize: sinonSandbox.stub().returns(Block()),
+						},
 					},
 					db: {
 						blocks: {
@@ -1044,6 +1047,7 @@ describe('transport', () => {
 
 				__private = {
 					broadcaster: {},
+					removePeer: sinonSandbox.stub(),
 				};
 
 				restoreRewiredTransportDeps = TransportModule.__set__({
@@ -1492,9 +1496,11 @@ describe('transport', () => {
 		});
 
 		describe('shared', () => {
+			var error;
+			var result;
+			var query;
+
 			describe('blocksCommon', () => {
-				var error;
-				var query;
 				var validateErr;
 
 				describe('when query is undefined', () => {
@@ -1574,7 +1580,6 @@ describe('transport', () => {
 							beforeEach(done => {
 								// All ids will be filtered out because they are non-numeric.
 								query = { ids: '"abc","def","ghi"' };
-								__private.removePeer = sinonSandbox.stub();
 								transportInstance.shared.blocksCommon(query, err => {
 									error = err;
 									done();
@@ -1610,10 +1615,6 @@ describe('transport', () => {
 			});
 
 			describe('blocks', () => {
-				var error;
-				var result;
-				var query;
-
 				describe('when query is undefined', () => {
 					beforeEach(done => {
 						query = undefined;
@@ -1686,41 +1687,78 @@ describe('transport', () => {
 			});
 
 			describe('postBlock', () => {
+				beforeEach(done => {
+					library.bus = {
+						message: sinonSandbox.stub(),
+					};
+					done();
+				});
+
 				describe('when query is undefined', () => {
-					it('should set query = {}');
-				});
+					var validationError = 'Failed to validate block schema: ...';
 
-				describe('when it throws', () => {
-					it(
-						'should call library.logger.debug with "Block normalization failed" and {err: e.toString(), module: "transport", block: query.block }'
-					);
+					beforeEach(done => {
+						query = undefined;
 
-					it(
-						'should call __private.removePeer with {peer: query.peer, code: "EBLOCK"}'
-					);
+						library.logic.block.objectNormalize = sinonSandbox
+							.stub()
+							.throws(validationError);
 
-					it('should call callback with error = e.toString()');
-				});
-
-				describe('when it does not throw', () => {
-					describe('when query.block is defined', () => {
-						it('should call bson.deserialize with Buffer.from(query.block)');
-
-						describe('block', () => {
-							it(
-								'should call modules.blocks.verify.addBlockProperties with query.block'
-							);
+						transportInstance.shared.postBlock(query, (err, res) => {
+							error = err;
+							result = res;
+							done();
 						});
 					});
 
-					it('should call library.logic.block.objectNormalize');
+					it('should pass back error in callback', () => {
+						expect(error).to.equal(validationError);
+						return expect(result).to.equal(undefined);
+					});
 				});
 
-				it('should call library.bus.message with "receiveBlock" and block');
+				// TODO: Implement tests once modifications to block serialization have been made.
+				describe.skip('when query is specified', () => {
+					beforeEach(done => {
+						transportInstance.shared.postBlock(query, (err, res) => {
+							error = err;
+							result = res;
+							done();
+						});
+					});
 
-				it(
-					'should call callback with error = null and result = {success: true, blockId: block.id}'
-				);
+					describe('when it throws', () => {
+						it(
+							'should call library.logger.debug with "Block normalization failed" and {err: e.toString(), module: "transport", block: query.block }'
+						);
+
+						it(
+							'should call __private.removePeer with {peer: query.peer, code: "EBLOCK"}'
+						);
+
+						it('should call callback with error = e.toString()');
+					});
+
+					describe('when it does not throw', () => {
+						describe('when query.block is defined', () => {
+							it('should call bson.deserialize with Buffer.from(query.block)');
+
+							describe('block', () => {
+								it(
+									'should call modules.blocks.verify.addBlockProperties with query.block'
+								);
+							});
+						});
+
+						it('should call library.logic.block.objectNormalize');
+					});
+
+					it('should call library.bus.message with "receiveBlock" and block');
+
+					it(
+						'should call callback with error = null and result = {success: true, blockId: block.id}'
+					);
+				});
 			});
 
 			describe('list', () => {
